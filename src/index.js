@@ -1,5 +1,3 @@
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
 const config = require("./config");
@@ -16,10 +14,11 @@ const allowedOrigins = config.frontendUrl
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. curl, Postman, server-side)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS blocked: ${origin}`));
+      if (allowedOrigins.some((o) => origin === o || origin.endsWith(".contentstack.com"))) {
+        return callback(null, true);
+      }
+      return callback(null, false);
     },
     methods: ["GET", "POST"],
   })
@@ -35,6 +34,7 @@ app.get("/api/health", (_req, res) => {
 // Products route
 app.use("/api", productsRouter);
 
-app.listen(config.port, () => {
-  console.log(`BFF running on http://localhost:${config.port}`);
+const port = config.port;
+app.listen(port, () => {
+  console.log(`BFF running on port ${port}`);
 });

@@ -7,30 +7,7 @@ const router = express.Router();
 // Products cache: TTL 5 min
 const productsCache = new NodeCache({ stdTTL: 300 });
 
-// ── MOCK DATA for testing the full E2E flow without real SAP product codes ──
-const MOCK_PRODUCTS = [
-  { code: "PR_0028-0004030"},
-  { code: "PR_0079-5216313"},
-  { code: "PR_0079-5261503" },
-
-];
-
-// ── Mock endpoint: GET /api/products/mock?query=xxx ──
-router.get("/products/mock", (req, res) => {
-  const { query } = req.query;
-  if (!query || query.trim().length === 0) {
-    return res.json(MOCK_PRODUCTS);
-  }
-  const q = query.toLowerCase();
-  const filtered = MOCK_PRODUCTS.filter(
-    (p) =>
-      (p.name || "").toLowerCase().includes(q) ||
-      (p.code || "").toLowerCase().includes(q)
-  );
-  return res.json(filtered);
-});
-
-// ── Real SAP endpoint: GET /api/products?query=CODE1,CODE2 ──
+// GET /api/products?query=CODE1,CODE2
 router.get("/products", async (req, res) => {
   try {
     const { query } = req.query;
@@ -50,10 +27,10 @@ router.get("/products", async (req, res) => {
     const cookies = await getToken();
 
     // Search products by IDs
-    const rawProducts = await searchProducts(query, cookies);
+    const rawData = await searchProducts(query, cookies);
 
-    // Normalize response to simplified format
-    const products = normalizeProducts(rawProducts);
+    // Normalize response
+    const products = normalizeProducts(rawData);
 
     // Cache results
     productsCache.set(cacheKey, products);
@@ -65,7 +42,7 @@ router.get("/products", async (req, res) => {
     if (error.response) {
       return res.status(error.response.status).json({
         error: "SAP API error",
-        details: error.response.data,
+        message: error.response.statusText,
       });
     }
 
@@ -74,7 +51,7 @@ router.get("/products", async (req, res) => {
 });
 
 function normalizeProducts(data) {
-  // SAP Rubix response format: { items: [...], notFoundItems: [...], pageNumber, itemsTotalCount }
+  if (!data) return [];
   const items = Array.isArray(data)
     ? data
     : data.items || data.products || data.results || data.value || [];
